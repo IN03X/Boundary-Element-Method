@@ -17,7 +17,11 @@ class SurfaceMesh:
         self.radius = None        # 球体半径（如果适用）
 
     def generate_sphere_stl(self, radius=1.0, resolution=12, filename="sphere.stl"):
-        """生成球体STL文件（使用numpy-stl）"""
+        """
+            Args:
+            radius:球体半径
+            resolution:分辨率
+        """
         # 生成顶点
         num_phi = resolution
         num_theta = 2 * resolution
@@ -66,13 +70,13 @@ class SurfaceMesh:
             faces.append([v0, v1, v2])
         
         # 创建STL网格
-        stl_mesh = stl_mesh.Mesh(np.zeros(len(faces), dtype=stl_mesh.Mesh.dtype))
+        stl_mesh_obj = stl_mesh.Mesh(np.zeros(len(faces), dtype=stl_mesh.Mesh.dtype))
         for i, face in enumerate(faces):
             for j in range(3):
-                stl_mesh.vectors[i][j] = vertices[face[j]]
+                stl_mesh_obj.vectors[i][j] = vertices[face[j]]
         
         # 保存STL文件
-        stl_mesh.save(filename)
+        stl_mesh_obj.save(filename)
         print(f"已生成球面STL文件: {filename} (半径={radius:.1f}m, 分辨率={resolution})")
         self.radius = radius
         return filename
@@ -182,15 +186,15 @@ class SurfaceMesh:
 def green_function(k, r, r0):
     """三维自由声场基本解"""
     R = distance.euclidean(r, r0)
-    #return np.exp(-1j * k * R) / (4 * np.pi * R)
-    return np.exp(1j * k * R) / (4 * np.pi * R)
+    return np.exp(-1j * k * R) / (4 * np.pi * R)
+    #return np.exp(1j * k * R) / (4 * np.pi * R)
 
 def green_function_derivative(k, r, r0, normal):
     """计算格林函数的法向导数"""
     R_vec = r - r0
     R = np.linalg.norm(R_vec)
-    #return (-1j * k * R - 1) * np.exp(-1j * k * R) / (4 * np.pi * R**3) * np.dot(R_vec, normal)
-    return (1j * k * R - 1) * np.exp(1j * k * R) / (4 * np.pi * R**3) * np.dot(R_vec, normal)
+    return (-1j * k * R - 1) * np.exp(-1j * k * R) / (4 * np.pi * R**3) * np.dot(R_vec, normal)
+    #return (1j * k * R - 1) * np.exp(1j * k * R) / (4 * np.pi * R**3) * np.dot(R_vec, normal)
 
 # 3. 奇异积分处理
 def singular_integration(k, centroid, normal, area):
@@ -383,22 +387,25 @@ class HelmholtzBEM:
 # 5. 主程序流程
 if __name__ == "__main__":
     # 参数设置
-    frequency = 50  # Hz
+    frequency = 500  # Hz
     c0 = 343  # 声速 (m/s)
     k = 2 * np.pi * frequency / c0  # 波数
-
-
+    
     # 1. 创建几何模型 (示例球体)
     mesh = SurfaceMesh()
-    sphere_file = "sphere.stl"
+    radius = 1.0
+    resolution = 40
+    sphere_file = f"sphere_radius_{radius}_resolution_{resolution}.stl"
     if not os.path.exists(sphere_file):
         print("正在生成球体STL文件...")
-        mesh.generate_sphere_stl(radius=1.0, resolution=15, filename=sphere_file)
-    
+        mesh.generate_sphere_stl(radius=radius, resolution=resolution, filename=sphere_file)
+    else:
+        print("已生成球体STL文件,直接加载")
+
     #加载STL文件
     mesh.load_from_stl(sphere_file)
-    #mesh.visualize()
-
+    mesh.visualize()
+    
     # 2. 组装BEM矩阵
     bem = HelmholtzBEM(mesh, k)
     bem.assemble_matrices()
@@ -440,9 +447,9 @@ if __name__ == "__main__":
 
     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
     # XY平面（横截面）
-    # bem.visualize_pressure_field(phi, v, plane='xy', z=0.5, 
-    #                             x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
-    #                             resolution=40)
+    bem.visualize_pressure_field(phi, v, plane='xy', z=0.5, 
+                                x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
+                                resolution=40)
     
     # XZ平面（子午面）
     bem.visualize_pressure_field(phi, v, plane='xz', z=0.0, 
