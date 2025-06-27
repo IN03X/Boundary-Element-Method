@@ -1,6 +1,9 @@
 import numpy as np
 from scipy.spatial import distance
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+import os
+from stl import mesh as stl_mesh  
 
 # 1. 几何模型定义与面元划分
 class SurfaceMesh:
@@ -11,64 +14,49 @@ class SurfaceMesh:
         self.areas = None         # 面元面积 (Nf,)
         self.normals = None       # 面元单位法向量 (Nf, 3)
         self.N = None             # 面元数量
+        self.radius = None        # 球体半径（如果适用）
 
-    def generate_sphere(self, radius=1.0, resolution=10):
-        """生成球面三角形网格（经纬线划分法）
-        Args:
-            radius: 球体半径
-            resolution: 网格分辨率（沿经线方向的面元数量）
-        """
+    def generate_sphere_stl(self, radius=1.0, resolution=12, filename="sphere.stl"):
+        """生成球体STL文件（使用numpy-stl）"""
+        # 生成顶点
+        num_phi = resolution
+        num_theta = 2 * resolution
+        
         vertices = []
-        faces = []
-        
-        # 生成顶点 - 使用球坐标转换
-        num_phi = resolution          # 纬度方向分段数
-        num_theta = 2 * resolution    # 经度方向分段数
-        
-        # 添加北极点
+        # 北极点
         vertices.append([0, 0, radius])
-        
-        # 生成中间层顶点
+        # 中间层顶点
         for i in range(1, num_phi):
-            phi = np.pi * i / num_phi  # [0, π]
+            phi = np.pi * i / num_phi
             for j in range(num_theta):
-                theta = 2 * np.pi * j / num_theta  # [0, 2π]
-                
+                theta = 2 * np.pi * j / num_theta
                 x = radius * np.sin(phi) * np.cos(theta)
                 y = radius * np.sin(phi) * np.sin(theta)
                 z = radius * np.cos(phi)
                 vertices.append([x, y, z])
-        
-        # 添加南极点
+        # 南极点
         vertices.append([0, 0, -radius])
         
-        # 创建面元 - 两极使用三角形扇，中间部分使用四边形分成两个三角形
-        
-        # 1. 北极区域 (连接北极点和第一纬度圈)
+        # 创建面元数据
+        faces = []
+        # 北极区
         for j in range(num_theta):
-            v0 = 0  # 北极
+            v0 = 0
             v1 = 1 + j
             v2 = 1 + (j + 1) % num_theta
             faces.append([v0, v1, v2])
-        
-        # 2. 中间区域
+        # 中间区
         for i in range(1, num_phi - 1):
             for j in range(num_theta):
-                # 当前层的索引
                 start = 1 + (i - 1) * num_theta
+                next_start = 1 + i * num_theta
                 v0 = start + j
                 v1 = start + (j + 1) % num_theta
-                
-                # 下一层的索引
-                next_start = 1 + i * num_theta
                 v2 = next_start + j
                 v3 = next_start + (j + 1) % num_theta
-                
-                # 创建两个三角形组成四边形
-                faces.append([v0, v1, v2])
-                faces.append([v1, v3, v2])
-        
-        # 3. 南极区域 (连接南极点和最后一纬度圈)
+                faces.append([v0, v1, v3])
+                faces.append([v0, v3, v2])
+        # 南极区
         south_pole = len(vertices) - 1
         last_ring_start = 1 + (num_phi - 2) * num_theta
         for j in range(num_theta):
@@ -77,35 +65,118 @@ class SurfaceMesh:
             v2 = south_pole
             faces.append([v0, v1, v2])
         
-        self.vertices = np.array(vertices)
-        self.faces = np.array(faces)
-        self.N = len(self.faces) 
+        # 创建STL网格
+        stl_mesh = stl_mesh.Mesh(np.zeros(len(faces), dtype=stl_mesh.Mesh.dtype))
+        for i, face in enumerate(faces):
+            for j in range(3):
+                stl_mesh.vectors[i][j] = vertices[face[j]]
+        
+        # 保存STL文件
+        stl_mesh.save(filename)
+        print(f"已生成球面STL文件: {filename} (半径={radius:.1f}m, 分辨率={resolution})")
+        self.radius = radius
+        return filename
+
+    def load_from_stl(self, filename):
+        """从STL文件加载网格"""
+        # 修正：使用stl_mesh模块而不是自身实例的mesh属性
+        stl_mesh_obj = stl_mesh.Mesh.from_file(filename)
+        self.N = len(stl_mesh_obj.vectors)
+        
+        # 提取顶点和面元
+        # STL网格中的每个三角形都是独立存储的，所以我们需要重建顶点列表
+        # 注意：STL文件中的顶点是按面存储的，会有重复顶点
+        all_vertices = stl_mesh_obj.vectors.reshape(-1, 3)
+        
+        # 创建唯一顶点列表
+        self.vertices = np.unique(all_vertices, axis=0)
+        
+        # 创建面元索引
+        self.faces = []
+        vertex_map = {}
+        for i, vertex in enumerate(self.vertices):
+            vertex_map[tuple(vertex)] = i
+            
+        for vectors in stl_mesh_obj.vectors:
+            face = []
+            for vector in vectors:
+                # 查找当前顶点在唯一列表中的索引
+                idx = vertex_map[tuple(vector)]
+                face.append(idx)
+            self.faces.append(face)
+        
+        self.faces = np.array(self.faces)
         
         # 计算面元属性
         self._compute_face_properties()
+        print(f"已加载STL文件: {filename} ({self.N}个面元)")
 
     def _compute_face_properties(self):
         """计算每个面元的质心、面积和法向量"""
-        self.centroids = np.zeros((len(self.faces), 3))
-        self.areas = np.zeros(len(self.faces))
-        self.normals = np.zeros((len(self.faces), 3))
+        self.centroids = np.zeros((self.N, 3))
+        self.areas = np.zeros(self.N)
+        self.normals = np.zeros((self.N, 3))
         
-        for idx, face in enumerate(self.faces):
-            v0, v1, v2 = self.vertices[face]
+        for i in range(self.N):
+            # 获取面元的三个顶点
+            v0, v1, v2 = self.vertices[self.faces[i]]
             
-            # 计算质心 (三个顶点的平均值)
+            # 计算质心
             centroid = (v0 + v1 + v2) / 3.0
-            self.centroids[idx] = centroid
+            self.centroids[i] = centroid
             
-            # 计算面法向量 (两条边的叉积)
+            # 计算面法向量
             edge1 = v1 - v0
             edge2 = v2 - v0
             normal = np.cross(edge1, edge2)
             
-            # 计算面积 (法向量模的一半) 并归一化法向量
+            # 计算面积
             area = 0.5 * np.linalg.norm(normal)
-            self.areas[idx] = area
-            self.normals[idx] = normal / (2 * area)  # 单位法向量
+            self.areas[i] = area
+            
+            # 归一化法向量
+            self.normals[i] = normal / (2 * area)
+
+    def visualize(self):
+        """可视化网格模型"""
+        if self.vertices is None or self.faces is None:
+            print("错误: 尚未加载网格数据")
+            return
+        
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        # 创建面元的集合
+        face_vertices = [self.vertices[face] for face in self.faces]
+        surface = Poly3DCollection(face_vertices, alpha=0.5, linewidths=0.5, edgecolor='k')
+        
+        # 设置面元颜色（基于法向量方向）
+        colors = np.abs((self.normals + 1.0) / 2.0)
+        surface.set_facecolor(colors)
+        
+        # 添加面元到绘图
+        ax.add_collection3d(surface)
+        
+        # 设置坐标轴
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        
+        if self.radius is not None:
+            ax.set_xlim([-self.radius, self.radius])
+            ax.set_ylim([-self.radius, self.radius])
+            ax.set_zlim([-self.radius, self.radius])
+            ax.set_title(f'球体网格可视化 (半径={self.radius:.1f}m, {self.N}个面元)')
+        else:
+            min_coords = np.min(self.vertices, axis=0)
+            max_coords = np.max(self.vertices, axis=0)
+            ax.set_xlim([min_coords[0], max_coords[0]])
+            ax.set_ylim([min_coords[1], max_coords[1]])
+            ax.set_zlim([min_coords[2], max_coords[2]])
+            ax.set_title(f'网格模型可视化 ({self.N}个面元)')
+        
+        plt.tight_layout()
+        plt.show()
 
 # 2. 核函数计算
 def green_function(k, r, r0):
@@ -315,11 +386,19 @@ if __name__ == "__main__":
     frequency = 500  # Hz
     c0 = 343  # 声速 (m/s)
     k = 2 * np.pi * frequency / c0  # 波数
-    
+
+
     # 1. 创建几何模型 (示例球体)
     mesh = SurfaceMesh()
-    mesh.generate_sphere(radius=1.0)
+    sphere_file = "sphere.stl"
+    if not os.path.exists(sphere_file):
+        print("正在生成球体STL文件...")
+        mesh.generate_sphere_stl(radius=1.0, resolution=15, filename=sphere_file)
     
+    #加载STL文件
+    mesh.load_from_stl(sphere_file)
+    mesh.visualize()
+
     # 2. 组装BEM矩阵
     bem = HelmholtzBEM(mesh, k)
     bem.assemble_matrices()
@@ -330,8 +409,8 @@ if __name__ == "__main__":
     
     # 上半球: Dirichlet边界 (Φ=1)
     upper = np.where(mesh.centroids[:, 2] > 0)[0]
-    bc_types[upper] = 0
-    bc_values[upper] = 1.0
+    bc_types[upper] = 1
+    bc_values[upper] = 0.5
     
     # 下半球: Neumann边界 (v=0.5)
     lower = np.where(mesh.centroids[:, 2] <= 0)[0]
@@ -354,16 +433,16 @@ if __name__ == "__main__":
             v[i] = bc_values[i]
             phi[i] = x[i]
     
-    # 6. 计算场点声压
+    # 6. 计算场点声势
     target_point = np.array([0, 0, 2.0])  # 球外点
     phi_target = bem.compute_potential(target_point, phi, v)
     print(f"Target potential at {target_point}: {phi_target:.4f}")
 
     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
     # XY平面（横截面）
-    bem.visualize_pressure_field(phi, v, plane='xy', z=0.5, 
-                                x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
-                                resolution=40)
+    # bem.visualize_pressure_field(phi, v, plane='xy', z=0.5, 
+    #                             x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
+    #                             resolution=40)
     
     # XZ平面（子午面）
     bem.visualize_pressure_field(phi, v, plane='xz', z=0.0, 
