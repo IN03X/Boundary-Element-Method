@@ -218,8 +218,8 @@ def green_function(k, r, r0):
         complex: 格林函数的值。
     """
     R = distance.euclidean(r, r0)
-    #return np.exp(-1j * k * R) / (4 * np.pi * R)
-    return np.exp(1j * k * R) / (4 * np.pi * R)
+    return np.exp(-1j * k * R) / (4 * np.pi * R)
+    #return np.exp(1j * k * R) / (4 * np.pi * R)
     # 两种基本解的定义，都可取用，不同处在于最后输出的声势虚部取反，声压需取模因此数值相同，振速虚部取反，取模后数值相同，因此两种定义无数值区别
 
 def green_function_derivative(k, r, r0, normal):
@@ -236,8 +236,8 @@ def green_function_derivative(k, r, r0, normal):
     """
     R_vec = r - r0
     R = np.linalg.norm(R_vec)
-    #return (-1j * k * R - 1) * np.exp(-1j * k * R) / (4 * np.pi * R**3) * np.dot(R_vec, normal)
-    return (1j * k * R - 1) * np.exp(1j * k * R) / (4 * np.pi * R**3) * np.dot(R_vec, normal)
+    return (-1j * k * R - 1) * np.exp(-1j * k * R) / (4 * np.pi * R**3) * np.dot(R_vec, normal)
+    #return (1j * k * R - 1) * np.exp(1j * k * R) / (4 * np.pi * R**3) * np.dot(R_vec, normal)
 
 # 3. 奇异积分处理
 def singular_integration(k, centroid, normal, area):
@@ -330,15 +330,15 @@ class HelmholtzBEM:
         for i in range(self.N):
             # (H + E) Φ = G v
             if bc_types[i] == 0:  # Dirichlet (给定Φ), 求v
-                A[i] = self.G[i]
-                b[i] = np.sum((self.H[i] + E[i]) * bc_values[i]) # 
+                A[i,:] = self.G[i,:]
+                b[i] = np.sum((self.H[i,:] + E[i,:]) * bc_values[i]) # 
             elif bc_types[i] == 1:  # Neumann (给定v), 求Φ
-                A[i] = self.H[i] + E[i]
-                b[i] = np.sum(self.G[i] * bc_values[i])
+                A[i,:] = self.H[i,:] + E[i,:]
+                b[i] = np.sum(self.G[i,:] * bc_values[i])
             elif bc_types[i] == 2:  # Robin (aΦ + bv = 0), 求Φ
                 # 0 = aGΦ + bGv = aGΦ + b(H + E)Φ
                 a, b_robin = bc_values[i] 
-                A[i] = a * self.G[i] + b_robin * (self.H[i] + E[i])
+                A[i,:] = a * self.G[i,:] + b_robin * (self.H[i,:] + E[i,:])
                 b[i] = 0
         
         return A, b
@@ -492,7 +492,7 @@ class HelmholtzBEM:
 # 5. 主程序流程
 if __name__ == "__main__":
     # 参数设置
-    frequency = 20  # Hz
+    frequency = 40  # Hz
     c0 = 343  # 声速 (m/s)
     k = 2 * np.pi * frequency / c0  # 波数
     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
@@ -511,7 +511,7 @@ if __name__ == "__main__":
         print("已生成球体STL文件,直接加载")
     #加载球体STL文件
     mesh.load_from_stl(sphere_file)
-    mesh.visualize()
+    #mesh.visualize()
 
     #1.2长方体模型
     # # 加载长方体STL文件
@@ -571,7 +571,7 @@ if __name__ == "__main__":
                                 x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
                                 resolution=40)
     
-    # YZ平面（另一个方向剖面）
+    # YZ平面
     bem.visualize_pressure_field(phi, v, plane='yz', z=0.0, 
                                 x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
                                 resolution=40)
