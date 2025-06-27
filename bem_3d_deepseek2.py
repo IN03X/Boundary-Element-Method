@@ -161,7 +161,7 @@ class SurfaceMesh:
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_zlabel('Z')
-        
+        plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
         if self.radius is not None:
             ax.set_xlim([-self.radius, self.radius])
             ax.set_ylim([-self.radius, self.radius])
@@ -383,7 +383,7 @@ class HelmholtzBEM:
 # 5. 主程序流程
 if __name__ == "__main__":
     # 参数设置
-    frequency = 500  # Hz
+    frequency = 50  # Hz
     c0 = 343  # 声速 (m/s)
     k = 2 * np.pi * frequency / c0  # 波数
 
@@ -397,7 +397,7 @@ if __name__ == "__main__":
     
     #加载STL文件
     mesh.load_from_stl(sphere_file)
-    mesh.visualize()
+    #mesh.visualize()
 
     # 2. 组装BEM矩阵
     bem = HelmholtzBEM(mesh, k)
