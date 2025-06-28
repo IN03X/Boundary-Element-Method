@@ -496,7 +496,7 @@ class HelmholtzBEM:
 # 5. 主程序流程
 if __name__ == "__main__":
     # 参数设置
-    frequency = 100  # Hz
+    frequency = 60  # Hz
     c0 = 343  # 声速 (m/s)
     k = 2 * np.pi * frequency / c0  # 波数
     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
@@ -581,7 +581,7 @@ if __name__ == "__main__":
     # XZ平面（子午面）
     bem.visualize_pressure_field(phi, v, plane='xz', z=0.0, 
                                 x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
-                                resolution=80)
+                                resolution=40)
 
     # YZ平面
     bem.visualize_pressure_field(phi, v, plane='yz', z=0.0, 
