@@ -325,7 +325,7 @@ class HelmholtzBEM:
         b = np.zeros(self.N, dtype=np.complex128)
         
         # 对角增强 (E矩阵) - 公式中 H = H0 + E
-        E = np.eye(self.N) * 0 
+        E = np.eye(self.N) * 0.5 
         
         for i in range(self.N):
             # (H + E) Φ = G v
@@ -492,7 +492,7 @@ class HelmholtzBEM:
 # 5. 主程序流程
 if __name__ == "__main__":
     # 参数设置
-    frequency = 40  # Hz
+    frequency = 100  # Hz
     c0 = 343  # 声速 (m/s)
     k = 2 * np.pi * frequency / c0  # 波数
     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
@@ -562,9 +562,9 @@ if __name__ == "__main__":
     print(f"Target potential at {target_point}: {phi_target:.4f}")
 
     # XY平面（横截面）
-    bem.visualize_pressure_field(phi, v, plane='xy', z=0.5, 
-                                x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
-                                resolution=40)
+    # bem.visualize_pressure_field(phi, v, plane='xy', z=0.5, 
+    #                             x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
+    #                             resolution=40)
     
     # XZ平面（子午面）
     bem.visualize_pressure_field(phi, v, plane='xz', z=0.0, 
