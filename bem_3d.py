@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 import os
 from stl import mesh as stl_mesh  
-
+import time
+from tqdm import tqdm
 # 1. 几何模型定义与面元划分
 class SurfaceMesh:
     def __init__(self):
@@ -289,7 +290,7 @@ class HelmholtzBEM:
         Returns:
             None
         """
-        for i in range(self.N):
+        for i in tqdm(range(self.N), desc="已计算的面元数"):
             r_i = self.mesh.centroids[i]
             n_i = self.mesh.normals[i]
             
@@ -374,6 +375,8 @@ class HelmholtzBEM:
         
         return phi_target
 
+    from tqdm import tqdm
+
     def visualize_pressure_field(self, phi, v, plane='xy', z=0.0, x_range=(-2, 2), y_range=(-2, 2), resolution=100):
         """
         计算并可视化声压场在某个平面上的分布
@@ -399,7 +402,7 @@ class HelmholtzBEM:
         Z = np.zeros_like(X, dtype=np.complex128)
         
         # 计算每个网格点处的声压
-        for i in range(resolution):
+        for i in tqdm(range(resolution), desc="声场生成进度"):
             for j in range(resolution):
                 if plane == 'xy':
                     point = [X[i, j], Y[i, j], z]
@@ -420,7 +423,7 @@ class HelmholtzBEM:
         
         # 绘制声压云图
         plt.imshow(pressure_dB, extent=[x_range[0], x_range[1], y_range[0], y_range[1]], 
-                   origin='lower', cmap='viridis')
+                origin='lower', cmap='viridis')
         plt.colorbar(label='声压级 (dB)')
         
         # 添加标题和标签
@@ -443,6 +446,7 @@ class HelmholtzBEM:
         plt.show()
         
         return X, Y, Z
+
     
     def _plot_sphere_cross_section(self, plane, z, x_range, y_range):
         """
@@ -502,7 +506,7 @@ if __name__ == "__main__":
     #1.1球体模型
     radius = 1.0
     mesh.radius = radius
-    resolution = 15
+    resolution = 30
     sphere_file = f"sphere_radius_{radius}_resolution_{resolution}.stl"
     if not os.path.exists(sphere_file):
         print("正在生成球体STL文件...")
@@ -520,26 +524,33 @@ if __name__ == "__main__":
     # mesh.visualize()  # 可视化长方体网格
     
     # 2. 组装BEM矩阵
+    HG_start_time = time.time()
     bem = HelmholtzBEM(mesh, k)
     bem.assemble_matrices()
+    HG_end_time = time.time()
+    print(f"计算HG矩阵运行时间: {HG_end_time - HG_start_time:.3f} 秒")
     
-    # 3. 设置边界条件 (示例)
+    # 3. 设置边界条件 (脉动球模型)
+    bc_start_time = time.time()
     bc_types = np.zeros(mesh.N)
     bc_values = np.zeros(mesh.N, dtype=np.complex128)
-    
     # 上半球: Neumann边界 (v=0.5)
     upper = np.where(mesh.centroids[:, 2] > 0)[0]
     bc_types[upper] = 1
     bc_values[upper] = 0.5
-    
     # 下半球: Neumann边界 (v=0.5)
     lower = np.where(mesh.centroids[:, 2] <= 0)[0]
     bc_types[lower] = 1
     bc_values[lower] = 0.5
+    bc_end_time = time.time()
+    print(f"边界条件应用时间: {bc_end_time - bc_start_time:.3f} 秒")
     
     # 4. 构建并求解方程组
+    equartion_start_time = time.time()
     A, b = bem.apply_boundary_conditions(bc_types, bc_values)
     x = bem.solve_system(A, b)
+    equartion_end_time = time.time()
+    print(f"求解线性方程组运行时间: {equartion_end_time - equartion_start_time:.3f} 秒")
     
     # 5. 分离解变量 (根据边界条件类型)
     phi = np.zeros(mesh.N, dtype=np.complex128)
@@ -556,11 +567,12 @@ if __name__ == "__main__":
             phi[i] = x[i]
 
     
-    # 6. 计算场点声势
-    target_point = np.array([0, 0, 2.0])  # 球外点
-    phi_target = bem.compute_potential(target_point, phi, v)
-    print(f"Target potential at {target_point}: {phi_target:.4f}")
+    # 6. 计算指定位置处场点声势
+    # target_point = np.array([0, 0, 2.0])  # 球外点
+    # phi_target = bem.compute_potential(target_point, phi, v)
+    # print(f"Target potential at {target_point}: {phi_target:.4f}")
 
+    # 7. 可视化声场
     # XY平面（横截面）
     # bem.visualize_pressure_field(phi, v, plane='xy', z=0.5, 
     #                             x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
@@ -569,8 +581,8 @@ if __name__ == "__main__":
     # XZ平面（子午面）
     bem.visualize_pressure_field(phi, v, plane='xz', z=0.0, 
                                 x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
-                                resolution=40)
-    
+                                resolution=80)
+
     # YZ平面
     bem.visualize_pressure_field(phi, v, plane='yz', z=0.0, 
                                 x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
