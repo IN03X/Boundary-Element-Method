@@ -32,7 +32,8 @@ for i in range(len(x)):
     for j in range(len(y)):
         if r[i, j] > a:  # 球外区域
             # 使用解析解公式: p = [j * ρ0 * c * v0] * [h0(kr) / h1(ka)]
-            p[i, j] = 1j * rho0 * c * v0 * hankel2(0, k * r[i, j]) / hankel2(1, k * a)
+            #p[i, j] = 1j * rho0 * c * v0 * hankel2(0, k * r[i, j]) / hankel2(1, k * a)
+            p[i, j] = v0 * hankel2(0, k * r[i, j]) / hankel2(1, k * a) #声势
 
 # 将帕斯卡转换为分贝
 def pa_to_db(pa, ref_pa=20e-6):
@@ -43,7 +44,7 @@ def pa_to_db(pa, ref_pa=20e-6):
 plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
 plt.figure(figsize=(10, 8))
 db_p = 20 * np.log10(np.abs(p) + 1e-12)  # 声压分贝值
-plt.imshow(db_p, extent=[X.min(), X.max(), Y.min(), Y.max()], cmap='viridis', aspect='auto', vmin=20, vmax=50)
+plt.imshow(db_p, extent=[X.min(), X.max(), Y.min(), Y.max()], cmap='viridis', aspect='auto', vmin=-5, vmax=-25)
 plt.colorbar(label='声压分贝值 [dB]')
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')

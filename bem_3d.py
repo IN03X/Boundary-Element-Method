@@ -506,7 +506,7 @@ if __name__ == "__main__":
     #1.1球体模型
     radius = 1.0
     mesh.radius = radius
-    resolution = 30
+    resolution = 15
     sphere_file = f"sphere_radius_{radius}_resolution_{resolution}.stl"
     if not os.path.exists(sphere_file):
         print("正在生成球体STL文件...")
