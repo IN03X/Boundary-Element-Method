@@ -205,7 +205,6 @@ class SurfaceMesh:
         plt.tight_layout()
         plt.show()
 
-
 # 2. 核函数计算
 def green_function(k, r, r0):
     """三维自由声场基本解
@@ -375,8 +374,6 @@ class HelmholtzBEM:
         
         return phi_target
 
-    from tqdm import tqdm
-
     def visualize_pressure_field(self, phi, v, plane='xy', z=0.0, x_range=(-2, 2), y_range=(-2, 2), resolution=100):
         """
         计算并可视化声压场在某个平面上的分布
@@ -447,7 +444,6 @@ class HelmholtzBEM:
         
         return X, Y, Z
 
-    
     def _plot_sphere_cross_section(self, plane, z, x_range, y_range):
         """
         Mesh为球体时运行,绘制球体的截面虚线轮廓,
@@ -492,46 +488,79 @@ class HelmholtzBEM:
         plt.xlim(x_range)
         plt.ylim(y_range)
 
+# 5. 总封装函数
+class Mesh2Field:
+    def __init__(self, frequency=60, mesh_file='cuboid.stl', bc_types=None, bc_values=None, ):
+        # 0. 参数设置
+        self.frequency = frequency  # Hz
+        self.c0 = 343  # 声速 (m/s)
+        self.k = 2 * np.pi * frequency / self.c0  # 波数
+        plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
+        self.mesh = SurfaceMesh()# 创建几何模型
+        self.mesh_file = mesh_file
+        self.bc_types = bc_types#设置边界
+        self.bc_values = bc_values
+        self.bc_phi = None
+        self.bc_v = None
+        # 1. 导入模型
+        self.mesh.load_from_stl(self.mesh_file)
+        self.mesh.visualize()  # 可视化
+        self.bem = HelmholtzBEM(self.mesh, self.k)
+        
 
-# 5. 主程序流程
+    def calc_bc_phiv(self):
+        # 2. 计算HG矩阵
+        HG_start_time = time.time()
+        self.bem.assemble_matrices()
+        HG_end_time = time.time()
+        print(f"计算HG矩阵运行时间: {HG_end_time - HG_start_time:.3f} 秒")
+        # 3. 解线性方程组
+        equartion_start_time = time.time()
+        A, b = self.bem.apply_boundary_conditions(self.bc_types, self.bc_values)
+        x = self.bem.solve_system(A, b)
+        equartion_end_time = time.time()
+        print(f"求解线性方程组运行时间: {equartion_end_time - equartion_start_time:.3f} 秒")
+        # 4. 分解得到边界上的声势和振速
+        phi = np.zeros(self.mesh.N, dtype=np.complex128)
+        v = np.zeros(self.mesh.N, dtype=np.complex128)
+        for i in range(self.mesh.N):
+            if self.bc_types[i] == 0:
+                phi[i] = self.bc_values[i]
+                v[i] = x[i]
+            elif self.bc_types[i] == 1:
+                v[i] = self.bc_values[i]
+                phi[i] = x[i]
+            elif self.bc_types[i] == 2:
+                phi[i] = x[i]
+                a, b_robin = self.bc_values[i] # Robin (aΦ + bv = 0), 求Φ
+                v[i] = -a/b_robin * phi[i]
+        self.bc_phi = phi
+        self.bc_v = v
+
+    def visualize_pressure_field(self, resolution=40, z=0.0, x_range=(-2.5, 2.5), y_range=(-2.5, 2.5)):
+        # XY平面
+        self.bem.visualize_pressure_field(self.bc_phi, self.bc_v, plane='xy', z=z, 
+                                        x_range=x_range, y_range=y_range,
+                                        resolution=resolution)
+        # XZ平面（子午面）
+        self.bem.visualize_pressure_field(self.bc_phi, self.bc_v, plane='xz', z=z, 
+                                        x_range=x_range, y_range=y_range,
+                                        resolution=resolution)
+        # YZ平面
+        self.bem.visualize_pressure_field(self.bc_phi, self.bc_v, plane='yz', z=z, 
+                                        x_range=x_range, y_range=y_range,
+                                        resolution=resolution)
+    def calc_field_p(self,target_point):
+        phi_target = self.bem.compute_potential(target_point, self.bc_phi, self.bc_v)
+        print(f"Target potential at {target_point}: {phi_target:.4f}")
+
+
+# 主程序
 if __name__ == "__main__":
-    # 参数设置
-    frequency = 60  # Hz
-    c0 = 343  # 声速 (m/s)
-    k = 2 * np.pi * frequency / c0  # 波数
-    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
-    mesh = SurfaceMesh()
-    
-    # 1. 创建几何模型
-    #1.1球体模型
-    radius = 1.0
-    mesh.radius = radius
-    resolution = 15
-    sphere_file = f"sphere_radius_{radius}_resolution_{resolution}.stl"
-    if not os.path.exists(sphere_file):
-        print("正在生成球体STL文件...")
-        mesh.generate_sphere_stl(radius=radius, resolution=resolution, filename=sphere_file)
-    else:
-        print("已生成球体STL文件,直接加载")
-    #加载球体STL文件
-    mesh.load_from_stl(sphere_file)
-    #mesh.visualize()
 
-    #1.2长方体模型
-    # # 加载长方体STL文件
-    # cuboid_file = "cuboid.stl"
-    # mesh.load_from_stl(cuboid_file)
-    # mesh.visualize()  # 可视化长方体网格
-    
-    # 2. 组装BEM矩阵
-    HG_start_time = time.time()
-    bem = HelmholtzBEM(mesh, k)
-    bem.assemble_matrices()
-    HG_end_time = time.time()
-    print(f"计算HG矩阵运行时间: {HG_end_time - HG_start_time:.3f} 秒")
-    
-    # 3. 设置边界条件 (脉动球模型)
-    bc_start_time = time.time()
+    mesh = SurfaceMesh()
+    mesh_file = "sphere_radius_1.0_resolution_15.stl"
+    mesh.load_from_stl(mesh_file)
     bc_types = np.zeros(mesh.N)
     bc_values = np.zeros(mesh.N, dtype=np.complex128)
     # 上半球: Neumann边界 (v=0.5)
@@ -542,48 +571,13 @@ if __name__ == "__main__":
     lower = np.where(mesh.centroids[:, 2] <= 0)[0]
     bc_types[lower] = 1
     bc_values[lower] = 0.5
-    bc_end_time = time.time()
-    print(f"边界条件应用时间: {bc_end_time - bc_start_time:.3f} 秒")
-    
-    # 4. 构建并求解方程组
-    equartion_start_time = time.time()
-    A, b = bem.apply_boundary_conditions(bc_types, bc_values)
-    x = bem.solve_system(A, b)
-    equartion_end_time = time.time()
-    print(f"求解线性方程组运行时间: {equartion_end_time - equartion_start_time:.3f} 秒")
-    
-    # 5. 分离解变量 (根据边界条件类型)
-    phi = np.zeros(mesh.N, dtype=np.complex128)
-    v = np.zeros(mesh.N, dtype=np.complex128)
-    
-    for i in range(mesh.N):
-        if bc_types[i] == 0:
-            phi[i] = bc_values[i]
-            v[i] = x[i]
-        elif bc_types[i] == 1:
-            v[i] = bc_values[i]
-            phi[i] = x[i]
-        elif bc_types[i] == 2:
-            phi[i] = x[i]
 
+    mesh_file = "sphere_radius_1.0_resolution_15.stl"
+    mesh2field_test = Mesh2Field(frequency=60,mesh_file=mesh_file,bc_types=bc_types,bc_values=bc_values)
+    mesh2field_test.calc_bc_phiv()
+    bc_phi = mesh2field_test.bc_phi
+    bc_v = mesh2field_test.bc_v
+    target_point = np.array([0, 0, 2.0])  # 球外点
+    mesh2field_test.calc_field_p(target_point=target_point)
+    mesh2field_test.visualize_pressure_field(resolution=40) #可视化
     
-    # 6. 计算指定位置处场点声势
-    # target_point = np.array([0, 0, 2.0])  # 球外点
-    # phi_target = bem.compute_potential(target_point, phi, v)
-    # print(f"Target potential at {target_point}: {phi_target:.4f}")
-
-    # 7. 可视化声场
-    # XY平面（横截面）
-    # bem.visualize_pressure_field(phi, v, plane='xy', z=0.5, 
-    #                             x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
-    #                             resolution=40)
-    
-    # XZ平面（子午面）
-    bem.visualize_pressure_field(phi, v, plane='xz', z=0.0, 
-                                x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
-                                resolution=40)
-
-    # YZ平面
-    bem.visualize_pressure_field(phi, v, plane='yz', z=0.0, 
-                                x_range=(-2.5, 2.5), y_range=(-2.5, 2.5),
-                                resolution=40)

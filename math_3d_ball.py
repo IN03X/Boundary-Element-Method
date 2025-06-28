@@ -1,4 +1,4 @@
-"""自由场3维脉动球声势解析解"""
+"""自由场3维脉动球声势解析解，用于对比"""
 import numpy as np
 from scipy.special import spherical_jn, spherical_yn
 import matplotlib.pyplot as plt
