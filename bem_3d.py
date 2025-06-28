@@ -408,11 +408,13 @@ class HelmholtzBEM:
                 elif plane == 'yz':
                     point = [z, X[i, j], Y[i, j]]
                 
-                # 计算该点的声压
+                # 计算该点的声势
                 Z[i, j] = self.compute_potential(point, phi, v)
         
         # 计算声压幅度 (dB)
-        magnitude = np.abs(Z)
+        rho0 = 1.2
+        c0 =343
+        magnitude = np.abs(self.k*rho0*c0*Z)
         pressure_dB = 20 * np.log10(magnitude + 1e-12)  # 避免log(0)，加小偏移量
         
         # 设置绘图
@@ -442,7 +444,7 @@ class HelmholtzBEM:
         plt.tight_layout()
         plt.show()
         
-        return X, Y, Z
+        return X, Y, Z, pressure_dB
 
     def _plot_sphere_cross_section(self, plane, z, x_range, y_range):
         """
@@ -491,6 +493,16 @@ class HelmholtzBEM:
 # 5. 总封装函数
 class Mesh2Field:
     def __init__(self, frequency=60, mesh_file='cuboid.stl', bc_types=None, bc_values=None, ):
+        """
+        重要参数介绍
+
+        :param mesh_file: 3D模型的存储路径
+        :param mesh: 3D模型, 归属于SurfaceMesh(), 请关注相关的函数
+        :param bc_types(list): 各个mesh所属的边界类型, 0: Dirichlet, 1: Neumann, 2: Robin, 就是三类常见边界条件
+        :param bc_values(list): 各个mesh所属的边界类型对应的边界值，对于Dirichlet和Neumann，边界值为单个值；对于Robin，边界值为 (a, b) 的元组。
+        :param bem: BEM模拟要用到的函数, 归属于HelmholtzBEM(self.mesh, self.k)
+        """
+
         # 0. 参数设置
         self.frequency = frequency  # Hz
         self.c0 = 343  # 声速 (m/s)
@@ -509,6 +521,11 @@ class Mesh2Field:
         
 
     def calc_bc_phiv(self):
+        """
+        计算边界上的声势和振速
+
+        :return: 边界上的声势和振速储存在 self.bc_phi 和 self.bc_v 之中, 下面程序会自己调用, 无需关注
+        """
         # 2. 计算HG矩阵
         HG_start_time = time.time()
         self.bem.assemble_matrices()
@@ -537,27 +554,38 @@ class Mesh2Field:
         self.bc_phi = phi
         self.bc_v = v
 
-    def visualize_pressure_field(self, resolution=40, z=0.0, x_range=(-2.5, 2.5), y_range=(-2.5, 2.5)):
+    def visualize_pressure_field(self, resolution=40, plane='xy',z=0.0, x_range=(-2.5, 2.5), y_range=(-2.5, 2.5)):
+        """
+        计算并可视化声压场
+
+        :param resolution: 压力场的分辨率，默认为40（即40x40）
+        :param plane: 选定计算的平面朝向，'xy', 'xz', 'yz'之一, 默认为'xy'
+        :param z: 选定要计算的平面的高度，z表示要计算的平面与所选平面的法向距离
+        :param x_range: x轴的范围，元组类型，默认为(-2.5, 2.5), 单位为米
+        :param y_range: y轴的范围，元组类型，默认为(-2.5, 2.5), 单位为米
+        :return: X, Y, Z 都为40x40的矩阵; X,Y包含这些点的X,Y位置信息; Z为这些点上的声势(复数，线性); pressure_dB为这些点上的声压级(dB)
+        """
         # XY平面
-        self.bem.visualize_pressure_field(self.bc_phi, self.bc_v, plane='xy', z=z, 
+        X,Y,Z,pressure_dB=self.bem.visualize_pressure_field(self.bc_phi, self.bc_v, plane=plane, z=z, 
                                         x_range=x_range, y_range=y_range,
                                         resolution=resolution)
-        # XZ平面（子午面）
-        self.bem.visualize_pressure_field(self.bc_phi, self.bc_v, plane='xz', z=z, 
-                                        x_range=x_range, y_range=y_range,
-                                        resolution=resolution)
-        # YZ平面
-        self.bem.visualize_pressure_field(self.bc_phi, self.bc_v, plane='yz', z=z, 
-                                        x_range=x_range, y_range=y_range,
-                                        resolution=resolution)
-    def calc_field_p(self,target_point):
+        return X,Y,Z,pressure_dB
+
+    def calc_point_potential(self,target_point):
+        """
+        计算特定点的声势, 要求此点在声源外部
+
+        :param target_point: 要求点的空间坐标(3x1), 单位为米,
+        :return: phi_target为此点上的声势(复数，线性)
+        """
         phi_target = self.bem.compute_potential(target_point, self.bc_phi, self.bc_v)
         print(f"Target potential at {target_point}: {phi_target:.4f}")
+        return phi_target
 
 
 # 主程序
 if __name__ == "__main__":
-
+    #下面这一大段是在生成边界条件,这是由于stl不包含材质信息,在NN训练时最好考虑使用包含边界条件的数据
     mesh = SurfaceMesh()
     mesh_file = "sphere_radius_1.0_resolution_15.stl"
     mesh.load_from_stl(mesh_file)
@@ -572,12 +600,17 @@ if __name__ == "__main__":
     bc_types[lower] = 1
     bc_values[lower] = 0.5
 
+    #下面是示例
+    #基本输入为: stl模型, 边界条件, 频率(注意一次只能模拟单频率)
+    #生成声场自定义参数输入为: 声场所在平面, 声场范围, 声场网格分辨率
+    #输出为：声场声压， 声场声势， 声场各点位置
     mesh_file = "sphere_radius_1.0_resolution_15.stl"
     mesh2field_test = Mesh2Field(frequency=60,mesh_file=mesh_file,bc_types=bc_types,bc_values=bc_values)
+    #计算边界上的声势和振速
     mesh2field_test.calc_bc_phiv()
-    bc_phi = mesh2field_test.bc_phi
-    bc_v = mesh2field_test.bc_v
-    target_point = np.array([0, 0, 2.0])  # 球外点
-    mesh2field_test.calc_field_p(target_point=target_point)
-    mesh2field_test.visualize_pressure_field(resolution=40) #可视化
+    #计算特定点的声势
+    target_point = np.array([0, 0, 2.0])  
+    mesh2field_test.calc_point_potential(target_point=target_point)
+    #计算并可视化声压场
+    X,Y,potential,pressure_dB=mesh2field_test.visualize_pressure_field(resolution=40, plane='xy',z=0.0, x_range=(-2.5, 2.5), y_range=(-2.5, 2.5)) 
     
