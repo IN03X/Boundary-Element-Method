@@ -370,7 +370,7 @@ class HelmholtzBEM:
             G_integral = green_function(self.k, r_target, r_j) * self.mesh.areas[j]
             H_integral = green_function_derivative(self.k, r_target, r_j, self.mesh.normals[j]) * self.mesh.areas[j]
             
-            phi_target += G_integral * v[j] - H_integral * phi[j]
+            phi_target += 2*G_integral * v[j] - 2*H_integral * phi[j]
         
         return phi_target
 
@@ -587,8 +587,8 @@ class Mesh2Field:
 if __name__ == "__main__":
     #下面这一大段是在生成边界条件,这是由于stl不包含材质信息,在NN训练时最好考虑使用包含边界条件的数据
     mesh = SurfaceMesh()
-    #mesh_file = "sphere_radius_1.0_resolution_15.stl"
-    mesh_file = "cuboid.stl"
+    mesh_file = "sphere_radius_1.0_resolution_15.stl"
+    #mesh_file = "cuboid.stl"
     mesh.load_from_stl(mesh_file)
     bc_types = np.zeros(mesh.N)
     bc_values = np.zeros(mesh.N, dtype=np.complex128)
@@ -605,8 +605,8 @@ if __name__ == "__main__":
     #基本输入为: stl模型, 边界条件, 频率(注意一次只能模拟单频率)
     #生成声场自定义参数输入为: 声场所在平面, 声场范围, 声场网格分辨率
     #输出为：声场声压， 声场声势， 声场各点位置
-    #mesh_file = "sphere_radius_1.0_resolution_15.stl"
-    mesh_file = "cuboid.stl"
+    mesh_file = "sphere_radius_1.0_resolution_15.stl"
+    #mesh_file = "cuboid.stl"
     mesh2field_test = Mesh2Field(frequency=10,mesh_file=mesh_file,bc_types=bc_types,bc_values=bc_values)
     #计算边界上的声势和振速
     mesh2field_test.calc_bc_phiv()
