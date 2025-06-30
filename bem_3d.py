@@ -370,7 +370,7 @@ class HelmholtzBEM:
             G_integral = green_function(self.k, r_target, r_j) * self.mesh.areas[j]
             H_integral = green_function_derivative(self.k, r_target, r_j, self.mesh.normals[j]) * self.mesh.areas[j]
             
-            phi_target += 2*G_integral * v[j] - 2*H_integral * phi[j]
+            phi_target += G_integral * v[j] - H_integral * phi[j]
         
         return phi_target
 
@@ -587,7 +587,7 @@ class Mesh2Field:
 if __name__ == "__main__":
     #下面这一大段是在生成边界条件,这是由于stl不包含材质信息,在NN训练时最好考虑使用包含边界条件的数据
     mesh = SurfaceMesh()
-    mesh_file = "sphere_radius_1.0_resolution_15.stl"
+    mesh_file = "sphere_radius_1.0_resolution_20.stl"
     #mesh_file = "cuboid.stl"
     mesh.load_from_stl(mesh_file)
     bc_types = np.zeros(mesh.N)
@@ -605,14 +605,14 @@ if __name__ == "__main__":
     #基本输入为: stl模型, 边界条件, 频率(注意一次只能模拟单频率)
     #生成声场自定义参数输入为: 声场所在平面, 声场范围, 声场网格分辨率
     #输出为：声场声压， 声场声势， 声场各点位置
-    mesh_file = "sphere_radius_1.0_resolution_15.stl"
+    mesh_file = "sphere_radius_1.0_resolution_20.stl"
     #mesh_file = "cuboid.stl"
-    mesh2field_test = Mesh2Field(frequency=10,mesh_file=mesh_file,bc_types=bc_types,bc_values=bc_values)
+    mesh2field_test = Mesh2Field(frequency=60,mesh_file=mesh_file,bc_types=bc_types,bc_values=bc_values)
     #计算边界上的声势和振速
     mesh2field_test.calc_bc_phiv()
     #计算特定点的声势
     target_point = np.array([0, 0, 2.0])  
     mesh2field_test.calc_point_potential(target_point=target_point)
     #计算并可视化声压场
-    X,Y,potential,pressure_dB=mesh2field_test.visualize_pressure_field(resolution=40, plane='xy',z=0.0, x_range=(-2.5, 2.5), y_range=(-2.5, 2.5)) 
+    X,Y,potential,pressure_dB=mesh2field_test.visualize_pressure_field(resolution=100, plane='xy',z=0.0, x_range=(-2.5, 2.5), y_range=(-2.5, 2.5)) 
     
