@@ -704,26 +704,26 @@ class Mesh2Field:
         return phi_target
 
 # 下面的主程序是使用任意的stl作为输入的, 可以使用这个程序生成需要的stl
-if __name__ == "__main__":
-    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
-    mesh = SurfaceMesh()
-    #1.1球体模型
-    radius = 1.0
-    mesh.radius = radius
-    resolution = 15
-    small_radius = 0.2
-    small_resolution = 12
-    small_center = [2.0, 0.0, 0.0]
-    sphere_file = f"sphere_radius_{radius}_{small_radius}_resolution_{resolution}_{small_resolution}_position{small_center}.stl"
-    if not os.path.exists(sphere_file):
-        print("正在生成球体STL文件...")
-        #mesh.generate_big_small_sphere_stl(radius=radius, resolution=resolution, filename=sphere_file)
-        mesh.generate_big_small_sphere_stl(radius=radius, resolution=resolution, small_radius=small_radius, small_resolution=small_resolution,small_center=small_center, filename=sphere_file)
-    else:
-        print("已生成球体STL文件,直接加载")
-    #加载球体STL文件
-    mesh.load_from_stl(sphere_file)
-    mesh.visualize()
+# if __name__ == "__main__":
+#     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
+#     mesh = SurfaceMesh()
+#     #1.1球体模型
+#     radius = 1.0
+#     mesh.radius = radius
+#     resolution = 15
+#     small_radius = 0.2
+#     small_resolution = 12
+#     small_center = [2.0, 0.0, 0.0]
+#     sphere_file = f"sphere_radius_{radius}_{small_radius}_resolution_{resolution}_{small_resolution}_position{small_center}.stl"
+#     if not os.path.exists(sphere_file):
+#         print("正在生成球体STL文件...")
+#         #mesh.generate_big_small_sphere_stl(radius=radius, resolution=resolution, filename=sphere_file)
+#         mesh.generate_big_small_sphere_stl(radius=radius, resolution=resolution, small_radius=small_radius, small_resolution=small_resolution,small_center=small_center, filename=sphere_file)
+#     else:
+#         print("已生成球体STL文件,直接加载")
+#     #加载球体STL文件
+#     mesh.load_from_stl(sphere_file)
+#     mesh.visualize()
 
 # 主程序
 if __name__ == "__main__":
@@ -734,17 +734,14 @@ if __name__ == "__main__":
     mesh.load_from_stl(mesh_file)
     bc_types = np.zeros(mesh.N)
     bc_values = np.zeros(mesh.N, dtype=np.complex128)
-    # 上半球: Neumann边界 (v=0.5)
-    upper = np.where(mesh.centroids[:, 2] > 0)[0]
-    bc_types[upper] = 1
-    bc_values[upper] = 0.5
-    # 下半球: Neumann边界 (v=0.5)
-    lower = np.where(mesh.centroids[:, 2] <= 0)[0]
+    # 脉动小球源
+    small = np.where(mesh.centroids[:, 0] > 1.5)[0]
+    bc_types[small] = 1
+    bc_values[small] = 0.5
+    # 刚性大球
+    lower = np.where(mesh.centroids[:, 0] <= 1.5)[0]
     bc_types[lower] = 1
-    bc_values[lower] = 0.5
-    # mesh_number = 400
-    # bc_types[mesh_number] = 1
-    # bc_values[mesh_number] = 20
+    bc_values[lower] = 0
 
     #下面是示例
     #基本输入为: stl模型, 边界条件, 频率(注意一次只能模拟单频率)
@@ -752,11 +749,11 @@ if __name__ == "__main__":
     #输出为：声场声压， 声场声势， 声场各点位置
     #mesh_file = "sphere_radius_1.0_resolution_15.stl"
     mesh_file = "sphere_radius_1.0_0.2_resolution_15_12_position[2.0, 0.0, 0.0].stl"
-    mesh2field_test = Mesh2Field(frequency=100,mesh_file=mesh_file,bc_types=bc_types,bc_values=bc_values)
+    mesh2field_test = Mesh2Field(frequency=163,mesh_file=mesh_file,bc_types=bc_types,bc_values=bc_values)
     #计算边界上的声势和振速
     mesh2field_test.calc_bc_phiv()
     #计算特定点的声势
     target_point = np.array([0, 0, 2.0])  
     mesh2field_test.calc_point_potential(target_point=target_point)
     #计算并可视化声压场
-    X,Y,potential,pressure_dB=mesh2field_test.visualize_pressure_field(resolution=100, plane='xy',z=0.0, x_range=(-2.5, 2.5), y_range=(-2.5, 2.5)) 
+    X,Y,potential,pressure_dB=mesh2field_test.visualize_pressure_field(resolution=80, plane='xy',z=0.0, x_range=(-2.5, 2.5), y_range=(-2.5, 2.5)) 
