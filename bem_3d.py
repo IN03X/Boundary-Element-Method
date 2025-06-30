@@ -587,7 +587,7 @@ class Mesh2Field:
 if __name__ == "__main__":
     #下面这一大段是在生成边界条件,这是由于stl不包含材质信息,在NN训练时最好考虑使用包含边界条件的数据
     mesh = SurfaceMesh()
-    mesh_file = "sphere_radius_1.0_resolution_20.stl"
+    mesh_file = "sphere_radius_1.0_resolution_15.stl"
     #mesh_file = "cuboid.stl"
     mesh.load_from_stl(mesh_file)
     bc_types = np.zeros(mesh.N)
@@ -600,12 +600,15 @@ if __name__ == "__main__":
     lower = np.where(mesh.centroids[:, 2] <= 0)[0]
     bc_types[lower] = 1
     bc_values[lower] = 0.5
+    # mesh_number = 400
+    # bc_types[mesh_number] = 1
+    # bc_values[mesh_number] = 20
 
     #下面是示例
     #基本输入为: stl模型, 边界条件, 频率(注意一次只能模拟单频率)
     #生成声场自定义参数输入为: 声场所在平面, 声场范围, 声场网格分辨率
     #输出为：声场声压， 声场声势， 声场各点位置
-    mesh_file = "sphere_radius_1.0_resolution_20.stl"
+    mesh_file = "sphere_radius_1.0_resolution_15.stl"
     #mesh_file = "cuboid.stl"
     mesh2field_test = Mesh2Field(frequency=60,mesh_file=mesh_file,bc_types=bc_types,bc_values=bc_values)
     #计算边界上的声势和振速
