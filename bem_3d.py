@@ -703,7 +703,7 @@ class Mesh2Field:
         print(f"Target potential at {target_point}: {phi_target:.4f}")
         return phi_target
 
-# 下面的主程序是使用任意的stl作为输入的, 可以使用这个程序生成需要的stl
+# 这个程序生成一个大球和一个小球的stl
 # if __name__ == "__main__":
 #     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
 #     mesh = SurfaceMesh()
@@ -713,7 +713,7 @@ class Mesh2Field:
 #     resolution = 15
 #     small_radius = 0.2
 #     small_resolution = 12
-#     small_center = [2.0, 0.0, 0.0]
+#     small_center = [0.5, 0.0, 0.0]
 #     sphere_file = f"sphere_radius_{radius}_{small_radius}_resolution_{resolution}_{small_resolution}_position{small_center}.stl"
 #     if not os.path.exists(sphere_file):
 #         print("正在生成球体STL文件...")
@@ -725,31 +725,41 @@ class Mesh2Field:
 #     mesh.load_from_stl(sphere_file)
 #     mesh.visualize()
 
-# 主程序
+# 主程序,使用任意的stl作为输入
 if __name__ == "__main__":
     #下面这一大段是在生成边界条件,这是由于stl不包含材质信息,在NN训练时最好考虑使用包含边界条件的数据
     mesh = SurfaceMesh()
     #mesh_file = "sphere_radius_1.0_resolution_15.stl"
-    mesh_file = "sphere_radius_1.0_0.2_resolution_15_12_position[2.0, 0.0, 0.0].stl"
+    mesh_file = "sphere_radius_1.0_0.2_resolution_15_12_position[0.5, 0.0, 0.0].stl"
     mesh.load_from_stl(mesh_file)
     bc_types = np.zeros(mesh.N)
     bc_values = np.zeros(mesh.N, dtype=np.complex128)
-    # 脉动小球源
-    small = np.where(mesh.centroids[:, 0] > 1.5)[0]
-    bc_types[small] = 1
-    bc_values[small] = 0.5
+
     # 刚性大球
-    lower = np.where(mesh.centroids[:, 0] <= 1.5)[0]
-    bc_types[lower] = 1
-    bc_values[lower] = 0
+    bc_types[:] = 1
+    bc_values[:] = 0
+
+    # 脉动小球源
+    # small = np.where(mesh.centroids[:, 0] > 1.5)[0]
+    # bc_types[small] = 1
+    # bc_values[small] = 0.5
+
+    # 脉动小球源
+    center = np.array([0.5, 0.0, 0.0])
+    radius = 0.45
+    distances = np.linalg.norm(mesh.centroids - center, axis=1)
+    in_sphere = np.where(distances <= radius)[0]
+    bc_types[in_sphere] = 1
+    bc_values[in_sphere] = 0.5
+    
 
     #下面是示例
     #基本输入为: stl模型, 边界条件, 频率(注意一次只能模拟单频率)
     #生成声场自定义参数输入为: 声场所在平面, 声场范围, 声场网格分辨率
     #输出为：声场声压， 声场声势， 声场各点位置
     #mesh_file = "sphere_radius_1.0_resolution_15.stl"
-    mesh_file = "sphere_radius_1.0_0.2_resolution_15_12_position[2.0, 0.0, 0.0].stl"
-    mesh2field_test = Mesh2Field(frequency=163,mesh_file=mesh_file,bc_types=bc_types,bc_values=bc_values)
+    mesh_file = "sphere_radius_1.0_0.2_resolution_15_12_position[0.5, 0.0, 0.0].stl"
+    mesh2field_test = Mesh2Field(frequency=60,mesh_file=mesh_file,bc_types=bc_types,bc_values=bc_values)
     #计算边界上的声势和振速
     mesh2field_test.calc_bc_phiv()
     #计算特定点的声势
