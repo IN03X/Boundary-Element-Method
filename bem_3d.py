@@ -563,6 +563,19 @@ class HelmholtzBEM:
             self._plot_sphere_cross_section(plane, z, x_range, y_range)
         
         plt.tight_layout()
+
+        # 创建 results 目录（如果不存在）
+        os.makedirs('results', exist_ok=True)
+
+        # 生成带时间戳的文件名
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%m%d_%H%M")
+        filename = f'results/pressure_field_{plane}_z{z:.1f}_{timestamp}.png'
+
+        # 保存图像
+        plt.savefig(filename)
+        print(f"图像已保存至: {filename}")
+
         plt.show()
         
         return X, Y, Z, pressure_dB
@@ -628,7 +641,8 @@ class Mesh2Field:
         self.frequency = frequency  # Hz
         self.c0 = 343  # 声速 (m/s)
         self.k = 2 * np.pi * frequency / self.c0  # 波数
-        plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
+        plt.rcParams['font.sans-serif'] = ['Noto Sans CJK JP']
+        plt.rcParams['axes.unicode_minus'] = False 
         self.mesh = SurfaceMesh()# 创建几何模型
         self.mesh_file = mesh_file
         self.bc_types = bc_types#设置边界
@@ -705,7 +719,8 @@ class Mesh2Field:
 
 # 这个程序生成一个大球和一个小球的stl
 # if __name__ == "__main__":
-#     plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
+#     plt.rcParams['font.sans-serif'] = ['Noto Sans CJK JP']
+#     plt.rcParams['axes.unicode_minus'] = False 
 #     mesh = SurfaceMesh()
 #     #1.1球体模型
 #     radius = 1.0

@@ -151,5 +151,6 @@ def create_cuboid_mesh(length=2.0, width=1.0, height=0.5, resolution=1, filename
 if __name__ == "__main__":
     # 生成长方体网格并导出STL
     # 默认：长2m, 宽1m, 高0.5m, 每个面分割数=1
-    plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
+    plt.rcParams['font.sans-serif'] = ['Noto Sans CJK JP']
+    plt.rcParams['axes.unicode_minus'] = False 
     create_cuboid_mesh(length=1, width=0.8, height=0.5, resolution=10)

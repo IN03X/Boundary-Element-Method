@@ -41,7 +41,8 @@ def pa_to_db(pa, ref_pa=20e-6):
 
 
 # 绘图 (声压分贝值)
-plt.rcParams['font.sans-serif'] = ['Microsoft YaHei']
+plt.rcParams['font.sans-serif'] = ['Noto Sans CJK JP']
+plt.rcParams['axes.unicode_minus'] = False 
 plt.figure(figsize=(10, 8))
 db_p = 20 * np.log10(np.abs(p) + 1e-12)  # 声压分贝值
 plt.imshow(db_p, extent=[X.min(), X.max(), Y.min(), Y.max()], cmap='viridis', aspect='auto', vmin=25, vmax=50)
